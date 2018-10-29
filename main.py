@@ -91,6 +91,7 @@ def enforce_working_directory():
 def play_round(quotes, total_guesses):
   """Selects a quote using _pick_quote().
   Conducts a round of the game using _give_hint()."""
+  os.system('clear')
   print(f"Number of remaining quotes: {len(quotes)}")
   quote, quotes = _pick_quote(quotes)
   for i in range(total_guesses):
@@ -120,7 +121,8 @@ def scrape_or_load():
 
 
 def main():
-  print(100*'\n' + colored((figlet_format("<  Quote  game  \\>")), 'green', attrs=['bold']))
+  os.system('clear')
+  print(colored((figlet_format("<  Quote  game  \\>")), 'green', attrs=['bold']))
   enforce_working_directory()
   quotes = scrape_or_load()
   total_guesses = 5 # max.5 unless more hints are added in _give_hint()
