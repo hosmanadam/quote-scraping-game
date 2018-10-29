@@ -28,11 +28,11 @@ def _load_from_csv():
     DR_object = DictReader(file)
     return [row for row in DR_object]
 
-def _pick_quote():
+def _pick_quote(quotes):
   """Called by play_round() to select random quote and update it with extra details using _scrape_details()."""
   quote = quotes.pop(choice(range(len(quotes)))) # popped-off quotes reapper on scrape_or_load()
   quote.update(_scrape_details(quote['href']))
-  return quote
+  return quote, quotes
 
 def _save_to_csv(quotes):
   """Called by _scrape_quotes to save quotes to CSV file."""
@@ -88,11 +88,11 @@ def enforce_working_directory():
   """Sets working directory to the folder this .py file is in"""
   os.chdir(os.sys.path[0])
 
-def play_round():
+def play_round(quotes, total_guesses):
   """Selects a quote using _pick_quote().
   Conducts a round of the game using _give_hint()."""
   print(f"Number of remaining quotes: {len(quotes)}")
-  quote = _pick_quote()
+  quote, quotes = _pick_quote(quotes)
   for i in range(total_guesses):
     print(_give_hint(i, quote))
     guess = input(colored("Your guess: ", attrs=['bold']))
@@ -103,6 +103,7 @@ def play_round():
       print(f"\nThat's not the one. {total_guesses-1-i} guesses left!")
     else:
       print(colored("\nSorry, you lose!", 'red') + f"\n(The author is {quote['author']}.)")
+  return quotes
 
 def scrape_or_load():
   """Asks user if they want to scrape web or load from CSV.
@@ -118,16 +119,19 @@ def scrape_or_load():
     return _load_from_csv()
 
 
-# GAME LOGIC
-print(100*'\n' + colored((figlet_format("<  Quote  game  \\>")), 'green', attrs=['bold']))
-enforce_working_directory()
-quotes = scrape_or_load()
-total_guesses = 5 # max.5 unless more hints are added in _give_hint()
-wants_to_play = True
-while wants_to_play:
-  play_round()
-  if quotes == []:
-    print(colored("\nALL OUT OF QUOTES.", attrs=['bold']))
-    break
-  wants_to_play = ask_to_play()
-print("\nThanks for playing, bye!\n")
+def main():
+  print(100*'\n' + colored((figlet_format("<  Quote  game  \\>")), 'green', attrs=['bold']))
+  enforce_working_directory()
+  quotes = scrape_or_load()
+  total_guesses = 5 # max.5 unless more hints are added in _give_hint()
+  wants_to_play = True
+  while wants_to_play:
+    quotes = play_round(quotes, total_guesses)
+    if quotes == []:
+      print(colored("\nALL OUT OF QUOTES.", attrs=['bold']))
+      break
+    wants_to_play = ask_to_play()
+  print("\nThanks for playing, bye!\n")
+
+if __name__ == '__main__':
+  main()
