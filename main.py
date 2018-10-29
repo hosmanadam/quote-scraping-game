@@ -1,11 +1,10 @@
 import os
-import requests
 from random import choice
-from bs4 import BeautifulSoup
-from time import sleep
 from pyfiglet import figlet_format
 from termcolor import colored
 from csv import DictWriter, DictReader
+
+import scraper
 
 
 def _give_hint(i, quote):
@@ -22,6 +21,13 @@ def _give_hint(i, quote):
   ]
   return hints[i]
 
+def _save_to_csv(quotes):
+  """Called by scrape_or_load() to save quotes to CSV file."""
+  with open('quotes.csv', 'w') as file:
+    DW_object = DictWriter(file, fieldnames=quotes[0].keys())
+    DW_object.writeheader()
+    DW_object.writerows(quotes)
+
 def _load_from_csv():
   """Called by scrape_or_load() to return saved quotes from CSV file."""
   with open('quotes.csv') as file:
@@ -29,51 +35,10 @@ def _load_from_csv():
     return [row for row in DR_object]
 
 def _pick_quote(quotes):
-  """Called by play_round() to select random quote and update it with extra details using _scrape_details()."""
+  """Called by play_round() to select random quote and update it with extra details using scraper.get_details()."""
   quote = quotes.pop(choice(range(len(quotes)))) # popped-off quotes reapper on scrape_or_load()
-  quote.update(_scrape_details(quote['href']))
+  quote.update(scraper.get_details(quote['href']))
   return quote, quotes
-
-def _save_to_csv(quotes):
-  """Called by _scrape_quotes to save quotes to CSV file."""
-  with open('quotes.csv', 'w') as file:
-    DW_object = DictWriter(file, fieldnames=quotes[0].keys())
-    DW_object.writeheader()
-    DW_object.writerows(quotes)
-
-def _scrape_details(url):
-  """Called by _pick_quote() to scrape current quote's subpage and return additional details."""
-  response = requests.get(url)
-  soup = BeautifulSoup(response.text, 'html.parser')
-  return {
-    'author_born_date': soup.find(class_="author-born-date").get_text(),
-    'author_born_location': soup.find(class_="author-born-location").get_text(),
-    'author_description': soup.find(class_="author-description").get_text()
-  }
-
-def _scrape_quotes():
-  """Called by scrape_or_load() to scrape quote blocks from all pages on website.
-  Extracts their info to a list of dicts.
-  Passes list to _save_to_csv() for saving and also returns it."""
-  url = 'http://quotes.toscrape.com/page/1/'
-  quotes_raw = []
-  while True:
-    print(f'Scraping {url} for quotes...')
-    response = requests.get(url)
-    soup = BeautifulSoup(response.text, 'html.parser')
-    quotes_raw += soup.find_all(class_='quote')
-    try:
-      url = 'http://quotes.toscrape.com' + soup.find(class_='next').a['href']
-    except AttributeError:
-      break
-    sleep(1)
-  quotes = [{
-    'text': quote.find(class_="text").get_text(),
-    'author': quote.find(class_="author").get_text(),
-    'href': 'http://quotes.toscrape.com' + quote.a['href']
-  } for quote in quotes_raw]
-  _save_to_csv(quotes)
-  return quotes
 
 def ask_to_play():
   """Asks the user to play again, and returns True or False depending on answer."""
@@ -108,14 +73,16 @@ def play_round(quotes, total_guesses):
 
 def scrape_or_load():
   """Asks user if they want to scrape web or load from CSV.
-  Calls _scrape_quotes() or _load_from_csv() accordingly."""
+  Calls scraper.get_quotes() or _load_from_csv() accordingly."""
   if not os.path.exists('quotes.csv'):
-    return _scrape_quotes()
+    return scraper.get_quotes()
   wants_to_scrape = input("Would you like to scrape the web to update your quotes before playing? (y/n) ")
   if not wants_to_scrape or wants_to_scrape[0].lower() not in 'yn':
     return scrape_or_load()
   if wants_to_scrape[0].lower() == 'y':
-    return _scrape_quotes()
+    quotes = scraper.get_quotes()
+    _save_to_csv(quotes)
+    return quotes
   if wants_to_scrape[0].lower() == 'n':
     return _load_from_csv()
 
