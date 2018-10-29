@@ -1,8 +1,3 @@
-# TODO - modify to scrape sites that weren't made to be scraped
-# TODO - add unit tests
-# TODO - add even more spelling flexibility to guesses
-
-
 import os
 import requests
 from random import choice
