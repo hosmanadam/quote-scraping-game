@@ -1,8 +1,10 @@
 import os
+import unicodedata
 from csv import DictReader, DictWriter
 from random import choice
 from time import sleep
 
+import regex
 from pyfiglet import figlet_format
 from termcolor import colored
 
@@ -14,11 +16,39 @@ from classes.BadQuoteError import BadQuoteError
 WAIT = 1
 
 
+def essentialize(full_name):
+  """Return the "essence" of a person's name, for fair comparison
+  
+  - strip whitespace, make lower case
+  - remove any middle names
+  - remove punctuation & accents (diacritical marks)
+  Examples:
+  (1) `'  Emily Jane Brontë'` → `'emilybronte'`
+  (2) `'J.R.R. Tolkien'` → `'jtolkien'`
+  """
+  names = full_name.strip().lower().replace('.', '. ').split(' ')
+  no_middle = names[0]
+  if len(names) > 1:
+    no_middle += names[-1]
+  no_punctuation = ''.join(char for char in no_middle if char not in " '.-")
+  no_accents = unicodedata.normalize('NFKD', no_punctuation).encode('ASCII', 'ignore').decode()
+  return no_accents
+
+def is_fuzzy_match(a, b):
+  """Return `True` if string `a` is "basically the same" as string `b`, else `False`
+  
+  - fuzzy string matching
+  - allows 1 mistake for every 6 characters in `a`, but at least 1
+  - mistake may be insertion, deletion, or substitution
+  """
+  fuzzlimit = round(len(a)/6) or 1
+  fuzzy = fr'(?:{b}){{i,d,s,e<={fuzzlimit}}}'
+  return bool(regex.fullmatch(fuzzy, a))
+
 def redact_author_description(author_description, author_name):
   for name in author_name.split(' '):
     author_description = author_description.replace(name, '█'*len(name))
   return author_description
-
 
 def _give_hint(i, quote):
   """Called by play_round() to return ith hint for quote."""
@@ -78,14 +108,17 @@ def play_round(quotes, total_guesses):
   for i in range(total_guesses):
     print(_give_hint(i, quote))
     guess = input(colored("Your guess: ", attrs=['bold']))
-    if guess.lower().replace(" ", "") == quote['author_name'].lower().replace(" ", ""):
+    # if essentialize(guess) == essentialize(quote['author_name']):
+    if is_fuzzy_match(essentialize(guess), essentialize(quote['author_name'])):
       print(colored("\nYou win!", 'magenta', attrs=['bold']))
       sleep(WAIT)
       break
     elif i < total_guesses-1:
       print(f"\nThat's not the one. {total_guesses-1-i} guesses left!")
     else:
-      print(colored("\nSorry, you lose!", 'red') + f"\n(The author is {quote['author_name']}.)")
+      print(colored("\nSorry, you lose!", 'red'), end='')
+      sleep(WAIT)
+      print(f" (The author is {quote['author_name']}.)")
     sleep(WAIT)
   return quotes
 
