@@ -1,11 +1,7 @@
 import math
 
 
-BIO_CUTOFF = 1000
-BIO_WIDTH = 60
-
-
-def justify(text, width):
+def justify_line(text, width):
   # break string into lines not longer than width
   words = text.split(' ')
   lines = []
@@ -32,10 +28,12 @@ def justify(text, width):
   return '\n'.join(lines)
 
 
-def format_text_block(text):
-  if len(text) > BIO_CUTOFF:
-    text = text[:BIO_CUTOFF] + '[...]'
+def format_text_block(text, cutoff=1000, width=60):
+  """Return at most `cutoff` chars of `text`, justified to given width"""
+  text = text.replace('\t', '')
+  if len(text) > cutoff:
+    text = text[:cutoff] + '[...]'
   formatted = []
   for line in text.split('\n'):
-    formatted.append(justify(line, BIO_WIDTH))
+    formatted.append(justify_line(line, width))
   return '\n\n'.join(formatted)

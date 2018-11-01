@@ -13,7 +13,8 @@ import ui
 from classes.BadQuoteError import BadQuoteError
 
 
-WAIT = 1
+PRINT_DELAY = 1
+CRAWL_DELAY = 1
 
 
 def essentialize(full_name):
@@ -46,12 +47,13 @@ def is_fuzzy_match(a, b):
   return bool(regex.fullmatch(fuzzy, a))
 
 def redact_author_description(author_description, author_name):
+  """Return text with all appearences of author's name replaced with name-length blocks of `'█'`"""
   for name in author_name.split(' '):
     author_description = author_description.replace(name, '█'*len(name))
   return author_description
 
 def _give_hint(i, quote):
-  """Called by play_round() to return ith hint for quote."""
+  """Return `i`th hint for given quote."""
   author_first = quote['author_name'].split(' ')[0]
   author_last = quote['author_name'].split(' ')[-1]
   author_description_redacted = redact_author_description(quote['author_description'], quote['author_name'])
@@ -64,30 +66,34 @@ def _give_hint(i, quote):
   ]
   return hints[i]
 
+def _scrape_and_save():
+  quotes = scraper.get_quotes(crawl_delay=CRAWL_DELAY, crawl_stop=10)
+  _save_to_csv(quotes)
+  return quotes
+
 def _save_to_csv(quotes):
-  """Called by scrape_or_load() to save quotes to CSV file."""
   with open('quotes.csv', 'w') as file:
     DW_object = DictWriter(file, fieldnames=quotes[0].keys())
     DW_object.writeheader()
     DW_object.writerows(quotes)
 
 def _load_from_csv():
-  """Called by scrape_or_load() to return saved quotes from CSV file."""
   with open('quotes.csv') as file:
     DR_object = DictReader(file)
     return [row for row in DR_object]
 
 def _pick_quote(quotes):
-  """Called by play_round() to select random quote and update it with extra details using scraper.get_quote_details()."""
-  quote = quotes.pop(choice(range(len(quotes)))) # popped-off quotes reapper on scrape_or_load()
+  """Return random quote updated with author details, or `None` if details are N/A"""
+  quote = quotes.pop(choice(range(len(quotes))))
   try:
     quote.update(scraper.get_quote_details(quote['author_href']))
     return quote, quotes
   except:
-    return _pick_quote(quotes)
+    sleep(CRAWL_DELAY)
+    return None, quotes
 
 def ask_to_play():
-  """Asks the user to play again, and returns True or False depending on answer."""
+  """Ask user to play again, and return `True` or `False` depending on answer"""
   wants_to_play = input("\nWould you like to keep playing? (y/n) ")
   if not wants_to_play or wants_to_play[0].lower() not in 'yn':
     return ask_to_play()
@@ -102,40 +108,41 @@ def enforce_working_directory():
 def play_round(quotes, total_guesses):
   """Selects a quote using _pick_quote().
   Conducts a round of the game using _give_hint()."""
-  os.system('clear')
-  print(f"Number of remaining quotes: {len(quotes)}")
-  quote, quotes = _pick_quote(quotes)
+  quote = {}
+  while not quote:
+    quote, quotes = _pick_quote(quotes)
+    os.system('clear')
+    print(f"Number of remaining quotes: {len(quotes)}")
+  sleep(PRINT_DELAY)
   for i in range(total_guesses):
     print(_give_hint(i, quote))
     guess = input(colored("Your guess: ", attrs=['bold']))
-    # if essentialize(guess) == essentialize(quote['author_name']):
     if is_fuzzy_match(essentialize(guess), essentialize(quote['author_name'])):
       print(colored("\nYou win!", 'magenta', attrs=['bold']))
-      sleep(WAIT)
+      sleep(PRINT_DELAY)
       break
     elif i < total_guesses-1:
       print(f"\nThat's not the one. {total_guesses-1-i} guesses left!")
     else:
       print(colored("\nSorry, you lose!", 'red'), end='')
-      sleep(WAIT)
+      sleep(PRINT_DELAY)
       print(f" (The author is {quote['author_name']}.)")
-    sleep(WAIT)
+    sleep(PRINT_DELAY)
   return quotes
 
 def scrape_or_load():
-  """Asks user if they want to scrape web or load from CSV.
-  Calls scraper.get_quotes() or _load_from_csv() accordingly."""
+  """Scrape web for quotes or load them from CSV
+
+  - scrape without asking if there's no CSV
+  - user can choose otherwise
+  """
   if not os.path.exists('quotes.csv'):
-    quotes = scraper.get_quotes()
-    _save_to_csv(quotes)
-    return quotes
+    return _scrape_and_save()
   wants_to_scrape = input("Would you like to scrape the web to update your quotes before playing? (y/n) ")
   if not wants_to_scrape or wants_to_scrape[0].lower() not in 'yn':
     return scrape_or_load()
   if wants_to_scrape[0].lower() == 'y':
-    quotes = scraper.get_quotes()
-    _save_to_csv(quotes)
-    return quotes
+    return _scrape_and_save()
   if wants_to_scrape[0].lower() == 'n':
     return _load_from_csv()
 
@@ -149,12 +156,13 @@ def main():
   wants_to_play = True
   while wants_to_play:
     quotes = play_round(quotes, total_guesses)
-    if quotes == []:
+    if quotes:
+      wants_to_play = ask_to_play()
+    else:
       print(colored("\nALL OUT OF QUOTES.", attrs=['bold']))
       break
-    wants_to_play = ask_to_play()
   print(colored("\nThanks for playing. Bye!\n", attrs=['bold']))
-  sleep(WAIT)
+  sleep(PRINT_DELAY)
 
 if __name__ == '__main__':
   main()

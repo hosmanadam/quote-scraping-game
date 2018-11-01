@@ -9,10 +9,10 @@ from classes.BadQuoteError import BadQuoteError
 
 
 SITE = 'https://www.goodreads.com'
-WAIT = 1
 
 
 def bounce_bad_quote(fn):
+  """Raise `BadQuoteError` if `fn` returns junk, else return result unchanged"""
   @wraps(fn)
   def wrapper(*args, **kwargs):
     result = fn(*args, **kwargs)
@@ -59,6 +59,7 @@ def extract_next_page_href(soup):
 
 
 def dictify(quotes_raw):
+  """Turn list of HTML blocks into list of neatly ordered dicts"""
   quotes = []
   for quote in quotes_raw:
     try:
@@ -72,8 +73,8 @@ def dictify(quotes_raw):
   return quotes
 
 
-def get_quotes():
-  """Return all quotes+metadata on website for given topic as list of dicts"""
+def get_quotes(crawl_delay=1, crawl_stop=None):
+  """Scrape all quotes+metadata from `SITE` for given topic and return as list of dicts"""
   url = SITE + '/quotes?page=1'
   quotes_raw = []
   while True:
@@ -81,18 +82,18 @@ def get_quotes():
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
     quotes_raw += soup.find_all(class_='quoteDetails')
-    if 'page=5' in url:  # TESTING - TODO: remove
-      break	             # TESTING - TODO: remove
+    if crawl_stop and f'page={crawl_stop}' in url:
+      break
     next_page_href = extract_next_page_href(soup)
     if not next_page_href:
       break
     url = SITE + next_page_href
-    sleep(WAIT)
+    sleep(crawl_delay)
   quotes = dictify(quotes_raw)
   return quotes
 
 
-# ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ QUOTE DETAILS ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
+# ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ QUOTE DETAILS (goodreads.com) ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
 
 
 @bounce_bad_quote
@@ -115,8 +116,9 @@ def extract_author_description(soup, author_id):
 
 
 def get_quote_details(author_href):
-  """Return author details as dict"""
-  response = requests.get(SITE + author_href)
+  """Scrape author details from `SITE` for given quote and return as dict"""
+  url = SITE + author_href
+  response = requests.get(url)
   author_id = re.search(r'(?<=/)(\d+)(?=\.)', author_href).group()
   soup = BeautifulSoup(response.text, 'html.parser')
   return {
@@ -124,3 +126,7 @@ def get_quote_details(author_href):
     'author_born_location': extract_author_born_location(response),
     'author_description': extract_author_description(soup, author_id)
   }
+
+# ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ QUOTE DETAILS (wikipedia.org) ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓ ↓
+
+# TODO
